@@ -1,56 +1,42 @@
-# pylint: disable=import-outside-toplevel
-# pylint: disable=line-too-long
-# flake8: noqa
-"""
-Escriba el codigo que ejecute la accion solicitada en cada pregunta.
-"""
+import os
+import zipfile
+from pathlib import Path
 
+import pandas as pd
 
 
 def pregunta_01():
-    """
-    Construya y retorne un dataframe de Pandas a partir del archivo
-    'files/input/clusters_report.txt'. Los requierimientos son los siguientes:
-    - El dataframe tiene la misma estructura que el archivo original.
-    - Los nombres de las columnas deben ser en minusculas, reemplazando los
-      espacios por guiones bajos.
-    - Las palabras clave deben estar separadas por coma y con un solo
-      espacio entre palabra y palabra.
-    """
-    import re
-    import pandas as pd
+    # 1. Descomprimir el archivo input.zip en la carpeta raíz
+    zip_path = Path("files/input.zip")
+    extract_to = Path(".")  # se extrae en el directorio actual
 
-    filas = []
-    with open("files/input/clusters_report.txt", encoding="utf-8") as file:
-        lines = file.readlines()
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        zf.extractall(extract_to)
 
-    fila_actual = None
-    for line in lines:
-        m = re.match(r"^\s*(\d+)\s+(\d+)\s+([\d,]+)\s*%\s+(.*)", line)
-        if m:
-            if fila_actual is not None:
-                filas.append(fila_actual)
-            cluster, cantidad, porcentaje, palabras = m.groups()
-            fila_actual = {
-                "cluster": int(cluster),
-                "cantidad_de_palabras_clave": int(cantidad),
-                "porcentaje_de_palabras_clave": float(porcentaje.replace(",", ".")),
-                "principales_palabras_clave": palabras.strip(),
-            }
-        elif (
-            fila_actual is not None
-            and line.strip() != ""
-            and not line.startswith("---")
-        ):
-            fila_actual["principales_palabras_clave"] += " " + line.strip()
+    # 2. Definir rutas base
+    base_input = Path("input")  # asumiendo que el zip crea esta carpeta
+    splits = ["train", "test"]
+    sentiments = ["negative", "positive", "neutral"]
 
-    if fila_actual is not None:
-        filas.append(fila_actual)
+    # 3. Asegurar que existe la carpeta de salida
+    output_dir = Path("files/output")
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    df = pd.DataFrame(filas)
-    col = df["principales_palabras_clave"]
-    col = col.str.replace(r"\s+", " ", regex=True)
-    col = col.str.replace(r"\s*,\s*", ", ", regex=True)
-    col = col.str.rstrip(".").str.strip()
-    df["principales_palabras_clave"] = col
-    return df
+    # 4. Procesar cada split
+    for split in splits:
+        data = []
+        split_path = base_input / split
+
+        for sentiment in sentiments:
+            folder = split_path / sentiment
+            if not folder.exists():
+                continue
+            for txt_file in folder.glob("*.txt"):
+                with open(txt_file, "r", encoding="utf-8") as f:
+                    phrase = f.read().strip()
+                data.append({"phrase": phrase, "target": sentiment})
+
+        # Crear DataFrame y guardar CSV
+        df = pd.DataFrame(data)
+        output_file = output_dir / f"{split}_dataset.csv"
+        df.to_csv(output_file, index=False)
