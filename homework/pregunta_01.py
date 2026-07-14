@@ -7,7 +7,6 @@ Escriba el codigo que ejecute la accion solicitada en cada pregunta.
 
 
 
-
 def pregunta_01():
     """
     Construya y retorne un dataframe de Pandas a partir del archivo
